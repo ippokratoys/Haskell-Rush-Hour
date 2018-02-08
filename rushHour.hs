@@ -13,7 +13,7 @@ input ="\
 
 data Point = Point { x::Int
                     ,y::Int
-                    } deriving (Show,Eq)
+                    } deriving (Show,Eq,Ord)
 
 data Car = Car { idChar :: Char
                ,startPoint :: Point
@@ -23,7 +23,12 @@ data Car = Car { idChar :: Char
 data State = State { listOfCars :: [Car]
                     ,lineSize:: Int
                     ,columnSize::Int
-                    } deriving (Show)
+                    } deriving (Show,Eq)
+
+instance Ord Car where
+    compare (Car '=' _ _ ) (Car idChar2 _ _) = LT
+    compare (Car idChar1 _ _) (Car '=' _ _) = GT
+    compare (Car idChar1 _ _) (Car idChar2 _ _) = if (idChar1==idChar2) then EQ else (if (idChar1<idChar2) then LT else GT)
 
 -- gets a String and return the size of the board
 getSize :: [Char] -> (Int,Int)
@@ -39,7 +44,7 @@ readState s = readFromStr ( State [] (fst size) (snd size) ) s (Set.empty) 0 0
 -- hist is a set with symbols that had already visited
 -- current i
 -- current j
-readFromStr curState [] _ _ _= curState
+readFromStr (State sCars size1 size2) [] _ _ _= State (List.sort sCars) size1 size2
 
 readFromStr curState (x:xs) hist i j
     | Set.member x hist = readFromStr curState xs hist (i) (j+1)
