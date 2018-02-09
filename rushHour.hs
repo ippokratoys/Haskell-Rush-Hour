@@ -6,7 +6,7 @@ import qualified Data.Map as Map
 input ="\
 \..abbb\n\
 \c.adee\n\
-\c==d..\n\
+\c..d==\n\
 \.g.dhh\n\
 \igjj.k\n\
 \illl.k"
@@ -91,3 +91,11 @@ listToMap (x:xs) initVal = listToMap xs newVal
 
 -- return list of points that this car lives on
 pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) | yy<-[y1..y2]] else [ (xx,y1) | xx<-[x1..x2] ]
+
+finalState s = if (y goalEndPoint)==colSize-1
+    then True
+    else False
+    where
+        goalCar = head $listOfCars s
+        goalEndPoint = endPoint goalCar
+        colSize = columnSize s
