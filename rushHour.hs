@@ -1,6 +1,7 @@
 import qualified Data.Set as Set
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
+import qualified Data.Map as Map
 
 input ="\
 \..abbb\n\
@@ -58,3 +59,35 @@ readFromStr curState (x:xs) hist i j
             newCar = if (horizontalLen/=0) then (Car x frsPnt (Point i $j+horizontalLen )  ) else (Car x frsPnt (Point (i+vericalLen) j)  )
             newState = State  ((listOfCars curState) ++ [newCar]) (lineSize curState) (columnSize curState)
             newHist = Set.insert x hist
+
+-- gets a state and return an equal string
+writeState s = printMap (lineSize s) (columnSize s) (stateToMap s (Map.empty)) 0 0
+
+-- gets a map of cars and prints it
+printMap iMax jMax m i j
+    | j == (jMax) = (if iMax-1==i then "" else "\n"++(printMap iMax jMax m (i+1) 0) )
+    | otherwise = firstElem ++ (printMap iMax jMax m i $j+1)
+    where
+        res = Map.lookup (i,j) m
+        firstElem = [if (Maybe.isJust res) then (Maybe.fromJust res) else '.']
+
+-- stateToMap :: State -> Map.Map a b -> Map.Map a b
+stateToMap (State [] size1 size2) curMap = curMap
+stateToMap (State (x:xs) size1 size2) curMap = stateToMap (State xs size1 size2) newMap
+    where
+        newMap =  addCarToMap x curMap
+        -- newMap = addCarToMap x curMap
+
+-- takes a car, produces a list of the points that gets in the map and insert them to the map
+addCarToMap curCar@(Car idCa (Point x1 y1) (Point x2 y2)) curMap = listToMap listOfPoints curMap
+    where
+        listOfPoints = [(x,idCa) | x<-pointsOfCar curCar]
+
+-- add a list of elements to map
+listToMap [] initVal = initVal
+listToMap (x:xs) initVal = listToMap xs newVal
+    where
+        newVal = (Map.insert (fst x) (snd x) initVal)
+
+-- return list of points that this car lives on
+pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) | yy<-[y1..y2]] else [ (xx,y1) | xx<-[x1..x2] ]
