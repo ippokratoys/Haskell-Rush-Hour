@@ -9,7 +9,7 @@ input ="\
 \c..d==\n\
 \.g.dhh\n\
 \igjj.k\n\
-\illl.k"
+\illl.k\n"
 
 
 data Point = Point { x::Int
@@ -45,7 +45,7 @@ readState s = readFromStr ( State [] (fst size) (snd size) ) s (Set.empty) 0 0
 -- hist is a set with symbols that had already visited
 -- current i
 -- current j
-readFromStr (State sCars size1 size2) [] _ _ _= State (List.sort sCars) size1 size2
+readFromStr (State sCars size1 size2) [] _ _ _= State (List.sort sCars) (size1-1) size2
 
 readFromStr curState (x:xs) hist i j
     | Set.member x hist = readFromStr curState xs hist (i) (j+1)
@@ -61,7 +61,7 @@ readFromStr curState (x:xs) hist i j
             newHist = Set.insert x hist
 
 -- gets a state and return an equal string
-writeState s = printMap (lineSize s) (columnSize s) (stateToMap s (Map.empty)) 0 0
+writeState s = (printMap (lineSize s) (columnSize s) (stateToMap s (Map.empty)) 0 0) ++ "\n"
 
 -- gets a map of cars and prints it
 printMap iMax jMax m i j
@@ -92,10 +92,54 @@ listToMap (x:xs) initVal = listToMap xs newVal
 -- return list of points that this car lives on
 pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) | yy<-[y1..y2]] else [ (xx,y1) | xx<-[x1..x2] ]
 
-finalState s = if (y goalEndPoint)==colSize-1
-    then True
-    else False
-    where
-        goalCar = head $listOfCars s
-        goalEndPoint = endPoint goalCar
-        colSize = columnSize s
+data Move = Move {
+                    getCar    :: Car,
+                    getOffset :: Int
+                 } deriving (Show)
+
+makeMove (State cars rows cols) (Move car offset) = State ncars rows cols
+    where point1  = startPoint car
+          point2  = endPoint   car
+          x1      = x point1
+          y1      = y point1
+          x2      = x point2
+          y2      = y point2
+          xdiff   = x1 - x2
+          npoint1 = if xdiff == 0 then (Point x1 (y1 + offset)) else (Point (x1 + offset) y1)
+          npoint2 = if xdiff == 0 then (Point x2 (y2 + offset)) else (Point (x2 + offset) y2)
+          ncar    = (Car (idChar car) npoint1 npoint2)
+          ncars   = List.insert ncar (List.delete car cars)
+
+successorMoves s = successorMovesUtil s (listOfCars s)
+
+successorMovesUtil _ []         = []
+successorMovesUtil s (car:cars) = (legalMoves s car) ++ successorMovesUtil s cars
+
+legalMoves s car = (legalMovesUtil s car 0 (\x -> x + 1)) ++ legalMovesUtil s car 0 (\x -> x - 1)
+
+legalMovesUtil s car offset next
+    | legalState (makeMove s nmove) = [(nmove, 1)] ++ legalMovesUtil s car noffset next
+    | otherwise                     = []
+    where noffset = next offset
+          nmove   = Move car noffset
+
+legalState (State cars rows cols) = if flag1 || flag2 then False else True
+    where flag1 = any (True==) (map (outOfBounds rows cols) cars)
+          pairs = [(car1, car2) | car1<-cars, car2<-(List.delete car1 cars)]
+          flag2 = any (True==) (map (\(car1, car2)-> carIntersect car1 car2) pairs)
+
+outOfBounds rows cols (Car _ (Point x1 y1) (Point x2 y2))
+    | x1 < 0 || y1 < 0 || x2 >= cols || y2 >= rows = True
+    | otherwise                                  = False
+
+carIntersect car1 car2
+    | null (List.intersect points1 points2) = False
+    | otherwise                             = True
+    where points1 = pointsOfCar car1
+          points2 = pointsOfCar car2
+
+-- y <-> x
+finalState (State cars _ cols)
+    | (Maybe.isJust res) && y (endPoint (Maybe.fromJust res)) == cols - 1 = True
+    | otherwise                                                           = False
+    where res = List.find (\car -> (idChar car) == '=') cars
