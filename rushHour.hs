@@ -1,7 +1,7 @@
-import qualified Data.Set as Set
-import qualified Data.List as List
+import qualified Data.Set   as Set
+import qualified Data.List  as List
 import qualified Data.Maybe as Maybe
-import qualified Data.Map as Map
+import qualified Data.Map   as Map
 
 input ="\
 \..abbb\n\
@@ -93,9 +93,9 @@ listToMap (x:xs) initVal = listToMap xs newVal
 pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) | yy<-[y1..y2]] else [ (xx,y1) | xx<-[x1..x2] ]
 
 data Move = Move {
-                    getCar    :: Car,
-                    getOffset :: Int
-                 } deriving (Show)
+    getCar    :: Car,
+    getOffset :: Int
+} deriving (Show)
 
 makeMove (State cars rows cols) (Move car offset) = State ncars rows cols
     where point1  = startPoint car
@@ -123,14 +123,15 @@ legalMovesUtil s car offset next
     where noffset = next offset
           nmove   = Move car noffset
 
+-- Maybe add fromList toList in pairs ?
 legalState (State cars rows cols) = if flag1 || flag2 then False else True
     where flag1 = any (True==) (map (outOfBounds rows cols) cars)
           pairs = [(car1, car2) | car1<-cars, car2<-(List.delete car1 cars)]
           flag2 = any (True==) (map (\(car1, car2)-> carIntersect car1 car2) pairs)
 
 outOfBounds rows cols (Car _ (Point x1 y1) (Point x2 y2))
-    | x1 < 0 || y1 < 0 || x2 >= cols || y2 >= rows = True
-    | otherwise                                  = False
+    | x1 < 0 || y1 < 0 || x2 >= rows || y2 >= cols = True
+    | otherwise                                    = False
 
 carIntersect car1 car2
     | null (List.intersect points1 points2) = False
@@ -138,12 +139,65 @@ carIntersect car1 car2
     where points1 = pointsOfCar car1
           points2 = pointsOfCar car2
 
--- y <-> x
 finalState (State cars _ cols)
     | (Maybe.isJust res) && y (endPoint (Maybe.fromJust res)) == cols - 1 = True
     | otherwise                                                           = False
     where res = List.find (\car -> (idChar car) == '=') cars
 
+data Edge = Edge {
+    move :: Move,
+    cost :: Int
+} deriving (Show, Eq)
+
+data Node = Node {
+    ancestor :: Maybe Node,
+    edge     :: Maybe Edge,
+    state    :: State,
+    gScore   :: Int,
+    fScore   :: Int
+} deriving (Show)
+
+instance Eq Node where
+    (Node na) == (Node nb) = (state na) == (state nb)
+
+instance Ord Node where
+    compare (Node na) (Node nb) = if (fScore na) < (fScore nb)
+                                  then LT
+                                  else GT
+
+solve initState     = solveUtil closedSet openSet h
+    where h         = \x -> 0
+          start     = Node Nothing Nothing initState 0 (h initState)
+          closedSet = Set.empty
+          openSet   = Set.insert start Set.empty
+
+solveUtil closedSet openSet h
+    where cnode = extractMin openSet
+          cstate = state cnode
+          getNeig = map (\(m, c) -> (makeMove cstate m, Edge m c))
+          rmClsd = \l:ls -> if Set.member l closedSet then rmClsd ls else l:rmClsd ls
+          updtNeig = \n@(s, Edge m c) -> if List.find (n==) (toList openSet)
+                                         then (if tgs@())
+          
+
+-- solveUtil closedSet openSet h
+--     | null openSet   = [] -- failure
+--     | finalState s   = [] -- reconstruct_path_
+--     | otherwise      = []
+--     where inf        = 1000000
+--           current    = extractMin openSet
+--           next       = \m      -> makeMove $ (state current) m
+--           within     = \set sa -> List.find (\sb -> (state sa) == (state sb)) (toList set)
+--           neighbor   = \(m, c) -> if Maybe.isJust n@(within $ openSet (ns@(next move)))
+--                                   then Maybe.fromJust (n, 0)
+--                                   else ((Node ns cs m inf inf), cost)
+--           rmClosed   = \(n:ns) -> if within closedSet n then rm ns else n:rm ns
+--           neighbors  = rmClosed $ map neighbor (successorMoves $ state current)
+--           nopenSet   = Set.delete current openSet
+--           nclosedSet = Set.insert current closedSet
+
+-- Draft implementation of heap-like functionallity
+extractMin set = head $ List.sort $ toList set
 
 
 
