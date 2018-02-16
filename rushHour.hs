@@ -221,3 +221,45 @@ main :: IO()
 main = printSolution state (solve state)
     where state = readState "...a\n==.a\n....\n....\n"
     
+------------------------ pairing heap code -------------------------------------
+
+data HeapElem = EmpHeapElem | HeapElem{ cost::Int
+                        , curState::State} deriving (Show)
+
+data PairingHeap = EmpHeap | PairingHeap { headOfHeap :: HeapElem
+                                        ,subheaps:: [PairingHeap] } deriving (Show)
+
+instance Ord HeapElem where
+    compare (HeapElem cost1 _) (HeapElem cost2 _) = compare cost1 cost2
+
+instance Eq HeapElem where
+    (HeapElem _ st1) == (HeapElem _ st2) = st1==st2
+
+
+
+findMin EmpHeap = EmpHeapElem
+findMin (PairingHeap el _) = el
+
+
+mergeHeap EmpHeap EmpHeap = EmpHeap
+mergeHeap EmpHeap heap2 = heap2
+mergeHeap heap1 EmpHeap = heap1
+mergeHeap heap1 heap2 = PairingHeap (min minHeap1 minHeap2) ( [oldMax] ++subHeap1 ++ subHeap2)
+    where
+        minHeap1 = findMin heap1
+        minHeap2 = findMin heap2
+        subHeap1 = subheaps heap1
+        subHeap2 = subheaps heap2
+        oldMax   = PairingHeap (max minHeap1 minHeap2) []
+
+insertHeap EmpHeap newElem = PairingHeap newElem []
+insertHeap theHeap newElem = mergeHeap theHeap (PairingHeap newElem [])
+
+mergeHeaps [] = EmpHeap
+mergeHeaps [heap1] = heap1
+mergeHeaps (heap1:heap2:heaps) = mergeHeap heap12 (mergeHeaps heaps)
+    where
+        heap12 = mergeHeap heap1 heap2
+
+deleteMinHeap EmpHeap = EmpHeap
+deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
