@@ -6,7 +6,7 @@ import qualified Data.Map   as Map
 input ="\
 \..abbb\n\
 \c.adee\n\
-\c..d==\n\
+\c==d..\n\
 \.g.dhh\n\
 \igjj.k\n\
 \illl.k\n"
@@ -95,7 +95,7 @@ pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) 
 data Move = Move {
     getCar    :: Car,
     getOffset :: Int
-} deriving (Show)
+} deriving (Show, Eq)
 
 makeMove (State cars rows cols) (Move car offset) = State ncars rows cols
     where point1  = startPoint car
@@ -118,10 +118,11 @@ successorMovesUtil s (car:cars) = (legalMoves s car) ++ successorMovesUtil s car
 legalMoves s car = (legalMovesUtil s car 0 (\x -> x + 1)) ++ legalMovesUtil s car 0 (\x -> x - 1)
 
 legalMovesUtil s car offset next
-    | legalState (makeMove s nmove) = [(nmove, 1)] ++ legalMovesUtil s car noffset next
+    | legalState (makeMove s nmove) = [(nmove, cost)] ++ legalMovesUtil s car noffset next
     | otherwise                     = []
     where noffset = next offset
           nmove   = Move car noffset
+          cost    = 1
 
 -- Maybe add fromList toList in pairs ?
 legalState (State cars rows cols) = if flag1 || flag2 then False else True
@@ -155,15 +156,12 @@ data Node = Node {
     state    :: State,
     gScore   :: Int,
     fScore   :: Int
-} deriving (Show)
-
-instance Eq Node where
-    (Node na) == (Node nb) = (state na) == (state nb)
+} deriving (Show, Eq)
 
 instance Ord Node where
-    compare (Node na) (Node nb) = if (fScore na) < (fScore nb)
-                                  then LT
-                                  else GT
+    compare na nb = if (fScore na) < (fScore nb)
+                    then LT
+                    else GT
 
 solve initState     = solveUtil closedSet openSet h
     where h         = \x -> 0
@@ -172,40 +170,63 @@ solve initState     = solveUtil closedSet openSet h
           openSet   = Set.insert start Set.empty
 
 solveUtil closedSet openSet h
-    where cnode = extractMin openSet
-          cstate = state cnode
-          getNeig = map (\(m, c) -> (makeMove cstate m, Edge m c))
-          rmClsd = \l:ls -> if Set.member l closedSet then rmClsd ls else l:rmClsd ls
-          updtNeig = \n@(s, Edge m c) -> if List.find (n==) (toList openSet)
-                                         then (if tgs@())
+    | Set.null openSet = []
+    | finalState cs    = reconstruct_path cn
+    | otherwise        = solveUtil nclosedSet nopenSet h
+    where cn           = Set.findMin openSet
+          cs           = state cn
+          smcs         = map (\(m, c) -> (makeMove cs m, Edge m c)) (successorMoves cs)
+          nclosedSet   = Set.insert cn closedSet
+          nopenSet     = updtNeig (rmFromSet openSet cn) cn h (rmInSet nclosedSet smcs)
 
+-- Just for now till i figure smth better
+rmFromSet set val = Set.fromList $ List.delete val (Set.toList set)
 
--- solveUtil closedSet openSet h
---     | null openSet   = [] -- failure
---     | finalState s   = [] -- reconstruct_path_
---     | otherwise      = []
---     where inf        = 1000000
---           current    = extractMin openSet
---           next       = \m      -> makeMove $ (state current) m
---           within     = \set sa -> List.find (\sb -> (state sa) == (state sb)) (toList set)
---           neighbor   = \(m, c) -> if Maybe.isJust n@(within $ openSet (ns@(next move)))
---                                   then Maybe.fromJust (n, 0)
---                                   else ((Node ns cs m inf inf), cost)
---           rmClosed   = \(n:ns) -> if within closedSet n then rm ns else n:rm ns
---           neighbors  = rmClosed $ map neighbor (successorMoves $ state current)
---           nopenSet   = Set.delete current openSet
---           nclosedSet = Set.insert current closedSet
+rmInSet _ [] = []
+rmInSet set (neig@(s, Edge m c):smcs) = if Maybe.isJust $ inSet set s
+                                        then rmInSet set smcs
+                                        else neig:(rmInSet set smcs)
 
--- Draft implementation of heap-like functionallity
-extractMin set = head $ List.sort $ toList set
+updtNeig openSet cn _ [] = openSet
+updtNeig openSet cn h (smc:smcs) = updtNeig os cn h smcs
+    where os = updtNeigUtil openSet cn h smc
 
+updtNeigUtil openSet cn h (s, Edge m c)
+    | (Maybe.isJust pn) = if tgs < (gScore $ Maybe.fromJust pn)
+                          then osa
+                          else openSet
+    | otherwise          = osb
+    where pn  = inSet openSet s
+          tgs = (gScore cn) + c
+          jcn = Just cn
+          je  = Just $ Edge m c
+          un  = Node jcn je s tgs (tgs + (h s))
+          osa = Set.insert un $ rmFromSet openSet (Maybe.fromJust pn)
+          osb = Set.insert un openSet
 
+inSet set s = List.find eqState lset
+    where eqState = \n -> (state n) == s
+          lset    = Set.toList set
 
+reconstruct_path (Node Nothing Nothing _ _ _) = []
+reconstruct_path (Node a e s g f) = (reconstruct_path ja) ++ [move je]
+    where ja = Maybe.fromJust a
+          je = Maybe.fromJust e
 
+-- DEBUGGING
+printSolution s [] = putStrLn (writeState s)
+printSolution s (m:ms) = do {
+                                putStrLn (writeState s);
+                                printSolution (makeMove s m) ms
+                            }
+
+main :: IO()
+main = printSolution state (solve state)
+    where state = readState "...a\n==.a\n....\n....\n"
 
 ------------------------ pairing heap code -------------------------------------
 
-data HeapElem = EmpHeapElem | HeapElem{ cost::Int
+data HeapElem = EmpHeapElem | HeapElem{ minCost::Int
                         , curState::State} deriving (Show)
 
 data PairingHeap = EmpHeap | PairingHeap { headOfHeap :: HeapElem
