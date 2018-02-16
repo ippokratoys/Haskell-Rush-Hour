@@ -178,7 +178,7 @@ solveUtil closedSet openSet h
           rmClsd = \l:ls -> if Set.member l closedSet then rmClsd ls else l:rmClsd ls
           updtNeig = \n@(s, Edge m c) -> if List.find (n==) (toList openSet)
                                          then (if tgs@())
-          
+
 
 -- solveUtil closedSet openSet h
 --     | null openSet   = [] -- failure
@@ -247,3 +247,45 @@ deleteMinHeap EmpHeap = EmpHeap
 deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
 
 --------------------------------------------------------------------------------
+---------------------------- heuristic -----------------------------------------
+findCar i j ([]) = Nothing
+findCar i j (fCar:tCars)
+    |elem (i,j) (pointsOfCar fCar)  = Just fCar
+    |otherwise                        = findCar i j (tCars)
+
+heuristic s = heuristicUtil s pntsRight
+    where
+        goalStart   = startPoint $head $listOfCars s
+        goalEnd     = endPoint $head $listOfCars s
+        numLines    = lineSize s
+        numCols     = columnSize s
+        pntsOfGoal  = pointsOfCar $head $listOfCars s
+        rightMost   = last pntsOfGoal
+        pntsRight   = [ (i,j) | i<-[fst rightMost], j<-[((snd rightMost)+1)..(numCols-1) ] ]
+
+heuristicUtil s [] = 0
+heuristicUtil s (pnt:pnts)
+    | Maybe.isJust carThere = 2 + extraCost + (heuristicUtil s pnts)
+    | otherwise = 1 + (heuristicUtil s pnts)
+    where
+        carThere  = findCar (fst pnt) (snd pnt) (listOfCars s)
+        dataCar   = Maybe.fromJust carThere
+        extraCost = canMove dataCar s
+
+canMove aCar s
+    | isVertical    = if ((isFree verticalBefore s) || (isFree verticalAfter s)) then 0 else 1
+    | otherwise     = if ((isFree horizontalBefore s) || (isFree horizontalAfter s)) then 0 else 1
+    where
+        isVertical = (y $startPoint aCar) == (y $endPoint aCar)
+        verticalBefore     = (1-(x $startPoint aCar),y $startPoint aCar)
+        verticalAfter      = (1+(x $endPoint aCar),y $endPoint aCar)
+        horizontalBefore   = (x $startPoint aCar, 1-(y $startPoint aCar))
+        horizontalAfter    = ((x $endPoint aCar), 1+(y $endPoint aCar))
+
+isFree pnt s
+    | outOfBounds (lineSize s) (columnSize s) fakeCar = False
+    | Maybe.isJust carThere = False
+    | otherwise = True
+    where
+        fakeCar  = Car '=' (Point (fst pnt) (snd pnt)) (Point (fst pnt) (snd pnt))
+        carThere = findCar (fst pnt) (snd pnt) (listOfCars s)
