@@ -177,7 +177,10 @@ solveUtil closedSet openSet h
           cs           = state cn
           smcs         = map (\(m, c) -> (makeMove cs m, Edge m c)) (successorMoves cs)
           nclosedSet   = Set.insert cn closedSet
-          nopenSet     = updtNeig (Set.delete cn openSet) cn h (rmInSet nclosedSet smcs)
+          nopenSet     = updtNeig (rmFromSet openSet cn) cn h (rmInSet nclosedSet smcs)
+
+-- Just for now till i figure smth better
+rmFromSet set val = Set.fromList $ List.delete val (Set.toList set) 
 
 rmInSet _ [] = []
 rmInSet set (neig@(s, Edge m c):smcs) = if Maybe.isJust $ inSet set s
@@ -198,7 +201,7 @@ updtNeigUtil openSet cn h (s, Edge m c)
           jcn = Just cn
           je  = Just $ Edge m c
           un  = Node jcn je s tgs (tgs + (h s))
-          osa = Set.insert un $ Set.delete (Maybe.fromJust pn) openSet
+          osa = Set.insert un $ rmFromSet openSet (Maybe.fromJust pn)
           osb = Set.insert un openSet
           
 inSet set s = List.find eqState lset
