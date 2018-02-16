@@ -8,7 +8,7 @@ input ="\
 \c.adee\n\
 \c==d..\n\
 \.g.dhh\n\
-\igjj.k\n\
+\igjjjk\n\
 \illl.k\n"
 
 
@@ -226,17 +226,16 @@ main = printSolution state (solve state)
 
 ------------------------ pairing heap code -------------------------------------
 
-data HeapElem = EmpHeapElem | HeapElem{ minCost::Int
-                        , curState::State} deriving (Show)
+data HeapElem = EmpHeapElem | HeapElem{curState::Node} deriving (Show,Ord,Eq)
 
 data PairingHeap = EmpHeap | PairingHeap { headOfHeap :: HeapElem
                                         ,subheaps:: [PairingHeap] } deriving (Show)
 
-instance Ord HeapElem where
-    compare (HeapElem cost1 _) (HeapElem cost2 _) = compare cost1 cost2
-
-instance Eq HeapElem where
-    (HeapElem _ st1) == (HeapElem _ st2) = st1==st2
+-- instance Ord HeapElem where
+--     compare (HeapElem cost1 _) (HeapElem cost2 _) = compare cost1 cost2
+--
+-- instance Eq HeapElem where
+--     (HeapElem _ st1) == (HeapElem _ st2) = st1==st2
 
 
 
@@ -269,12 +268,13 @@ deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
 
 --------------------------------------------------------------------------------
 ---------------------------- heuristic -----------------------------------------
+tryFindCar i j s = if ( i < (lineSize s)) && (j < (columnSize s)) then findCar i j (listOfCars s) else Nothing
 findCar i j ([]) = Nothing
 findCar i j (fCar:tCars)
     |elem (i,j) (pointsOfCar fCar)  = Just fCar
     |otherwise                        = findCar i j (tCars)
 
-heuristic s = heuristicUtil s pntsRight
+heuristic s = (heuristicUtil s pntsRight)+(if ((length pntsRight)/=0) then 1 else 0)
     where
         goalStart   = startPoint $head $listOfCars s
         goalEnd     = endPoint $head $listOfCars s
@@ -286,22 +286,38 @@ heuristic s = heuristicUtil s pntsRight
 
 heuristicUtil s [] = 0
 heuristicUtil s (pnt:pnts)
-    | Maybe.isJust carThere = 2 + extraCost + (heuristicUtil s pnts)
-    | otherwise = 1 + (heuristicUtil s pnts)
+    | Maybe.isJust carThere = max (1 + extraCost) (heuristicUtil s pnts)
+    | otherwise = 0 + (heuristicUtil s pnts)
     where
         carThere  = findCar (fst pnt) (snd pnt) (listOfCars s)
         dataCar   = Maybe.fromJust carThere
-        extraCost = canMove dataCar s
+        extraCost = canMove [] (Just dataCar) s
 
-canMove aCar s
-    | isVertical    = if ((isFree verticalBefore s) || (isFree verticalAfter s)) then 0 else 1
-    | otherwise     = if ((isFree horizontalBefore s) || (isFree horizontalAfter s)) then 0 else 1
+canMove _ (Nothing) s = 0
+
+canMove seen (Just aCar) s
+    | elem aCar seen = 0
+    | isVertical    =
+        if ((inBounds verticalBefore s && Maybe.isNothing carUp) || (inBounds verticalAfter s && Maybe.isNothing carDown)) then
+            0
+         else
+             1+(min (canMove newSeen ( carUp) s) (canMove newSeen ( carDown) s))
+    | otherwise     =
+        if ((inBounds horizontalBefore s && Maybe.isNothing carLeft ) || ( inBounds horizontalAfter s && Maybe.isNothing carRight)) then
+            0
+        else
+            1+(min (canMove newSeen ( carLeft) s) (canMove newSeen ( carRight) s))
     where
-        isVertical = (y $startPoint aCar) == (y $endPoint aCar)
-        verticalBefore     = (1-(x $startPoint aCar),y $startPoint aCar)
+        isVertical         = (y $startPoint aCar) == (y $endPoint aCar)
+        verticalBefore     = ((x $startPoint aCar)-1,y $startPoint aCar)
         verticalAfter      = (1+(x $endPoint aCar),y $endPoint aCar)
-        horizontalBefore   = (x $startPoint aCar, 1-(y $startPoint aCar))
-        horizontalAfter    = ((x $endPoint aCar), 1+(y $endPoint aCar))
+        horizontalBefore   = (x $startPoint aCar, (y $startPoint aCar)-1)
+        horizontalAfter    = (x $endPoint aCar, 1+(y $endPoint aCar))
+        carUp              = tryFindCar (fst verticalBefore) (snd verticalBefore) s
+        carDown            = tryFindCar (fst verticalAfter) (snd verticalAfter) s
+        carLeft            = tryFindCar (fst horizontalBefore) (snd horizontalBefore) s
+        carRight           = tryFindCar (fst horizontalAfter) (snd horizontalAfter) s
+        newSeen            = (aCar:seen)
 
 isFree pnt s
     | outOfBounds (lineSize s) (columnSize s) fakeCar = False
@@ -310,3 +326,5 @@ isFree pnt s
     where
         fakeCar  = Car '=' (Point (fst pnt) (snd pnt)) (Point (fst pnt) (snd pnt))
         carThere = findCar (fst pnt) (snd pnt) (listOfCars s)
+
+inBounds (i,j) s = if ( i < (lineSize s)) && (j < (columnSize s)) then True else False
