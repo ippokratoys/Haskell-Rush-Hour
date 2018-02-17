@@ -266,9 +266,34 @@ mergeHeaps (heap1:heap2:heaps) = mergeHeap heap12 (mergeHeaps heaps)
     where
         heap12 = mergeHeap heap1 heap2
 
+-- updateHeap theHeap newElem =
+
 deleteMinHeap EmpHeap = EmpHeap
 deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
 
+deleteElemHeap EmpHeap _ = EmpHeap
+deleteElemHeap (PairingHeap EmpHeapElem subStates) delState = (PairingHeap EmpHeapElem subStates)
+deleteElemHeap (PairingHeap headState subStates) delState = if (isSameNode (curState headState) delState)
+    then (deleteMinHeap (PairingHeap headState subStates))
+    else (if isDone
+        then theUpdList
+        else theInsList)
+    where
+        resOfDel    = deleteFromList delState subStates
+        isDone      = fst resOfDel
+        theUpdList  = PairingHeap headState (snd resOfDel)
+        theInsList  = insertHeap (PairingHeap headState subStates) (HeapElem delState)
+
+deleteFromList delState [] = (False,[])
+deleteFromList delState (st:sts) = if (isSameNode delState $curState $headOfHeap st)
+    then (True,(newState:sts))
+    else ((fst res),(st:(snd res)))
+    where
+        newState = deleteMinHeap st
+        res = deleteFromList delState sts
+-- deleteElemHeap initHeap delState =
+
+isSameNode s1 s2 = (state s1) == (state s2)
 --------------------------------------------------------------------------------
 ---------------------------- heuristic -----------------------------------------
 tryFindCar i j s = if ( i < (lineSize s)) && (j < (columnSize s)) then findCar i j (listOfCars s) else Nothing
