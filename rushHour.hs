@@ -124,11 +124,15 @@ legalMovesUtil s car offset next
           nmove   = Move car noffset
           cost    = 1
 
--- Maybe add fromList toList in pairs ?
 legalState (State cars rows cols) = if flag1 || flag2 then False else True
     where flag1 = any (True==) (map (outOfBounds rows cols) cars)
-          pairs = [(car1, car2) | car1<-cars, car2<-(List.delete car1 cars)]
+          pairs = combos Set.empty [(car1, car2) | car1<-cars, car2<-(List.delete car1 cars)]
           flag2 = any (True==) (map (\(car1, car2)-> carIntersect car1 car2) pairs)
+
+combos _ [] = []
+combos set ((car1, car2):ccs) = if Set.member (car2, car1) set
+                                then combos set ccs
+                                else (car1, car2):combos (Set.insert (car1, car2) set) ccs
 
 outOfBounds rows cols (Car _ (Point x1 y1) (Point x2 y2))
     | x1 < 0 || y1 < 0 || x2 >= rows || y2 >= cols = True
@@ -140,10 +144,8 @@ carIntersect car1 car2
     where points1 = pointsOfCar car1
           points2 = pointsOfCar car2
 
-finalState (State cars _ cols)
-    | (Maybe.isJust res) && y (endPoint (Maybe.fromJust res)) == cols - 1 = True
-    | otherwise                                                           = False
-    where res = List.find (\car -> (idChar car) == '=') cars
+finalState (State cars _ cols) = if horizontalPos == cols - 1 then True else False
+    where horizontalPos = y $ endPoint $ head cars
 
 data Edge = Edge {
     move :: Move,
@@ -169,6 +171,8 @@ solve initState     = solveUtil closedSet openSet h
           closedSet = Set.empty
           openSet   = Set.insert start Set.empty
 
+-- Need to take care of rmInSet, rmFromSet & inSet probably
+-- i.e. Replace them with new Heap Funcionality
 solveUtil closedSet openSet h
     | Set.null openSet = []
     | finalState cs    = reconstruct_path cn
@@ -179,7 +183,6 @@ solveUtil closedSet openSet h
           nclosedSet   = Set.insert cn closedSet
           nopenSet     = updtNeig (rmFromSet openSet cn) cn h (rmInSet nclosedSet smcs)
 
--- Just for now till i figure smth better
 rmFromSet set val = Set.fromList $ List.delete val (Set.toList set)
 
 rmInSet _ [] = []
@@ -214,15 +217,15 @@ reconstruct_path (Node a e s g f) = (reconstruct_path ja) ++ [move je]
           je = Maybe.fromJust e
 
 -- DEBUGGING
-printSolution s [] = putStrLn (writeState s)
-printSolution s (m:ms) = do {
-                                putStrLn (writeState s);
-                                printSolution (makeMove s m) ms
-                            }
+-- printSolution s [] = putStrLn (writeState s)
+-- printSolution s (m:ms) = do {
+--                                 putStrLn (writeState s);
+--                                 printSolution (makeMove s m) ms
+--                             }
 
-main :: IO()
-main = printSolution state (solve state)
-    where state = readState "...a\n==.a\n....\n....\n"
+-- main :: IO()
+-- main = printSolution state (solve state)
+--     where state = readState "...a\n==.a\n....\n....\n"
 
 ------------------------ pairing heap code -------------------------------------
 
