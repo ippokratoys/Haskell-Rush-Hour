@@ -19,15 +19,6 @@ input = "\
 \....d.\n"
 
 -- MEDIUM
--- input ="\
--- \..abbb\n\
--- \c.adee\n\
--- \c==d..\n\
--- \.g.dhh\n\
--- \igjjjk\n\
--- \illl.k\n"
-
--- HARD
 -- input = "\
 -- \abccde\n\
 -- \abffde\n\
@@ -35,6 +26,15 @@ input = "\
 -- \j..ghi\n\
 -- \j..k..\n\
 -- \.llk..\n"
+
+-- HARD
+-- input = "\
+-- \aaabcd\n\
+-- \effbcd\n\
+-- \e.==cd\n\
+-- \ggh...\n\
+-- \.ih.jj\n\
+-- \.ikkll\n"
 
 printSolution s [] = putStrLn (writeState s)
 printSolution s (m:ms) = do {
@@ -223,19 +223,19 @@ solve_astar initState = solveBy initState heuristic
 -- Using the A* search algorithm solve the problem
 -- specified by 'initState' using the heuristic function 'h'
 solveBy initState h   = solveUtil closedSet openSet h
-    where   start     = Node Nothing Nothing initState 0 (h initState)
+    where   start     = HeapElem $ Node Nothing Nothing initState 0 (h initState)
             closedSet = Set.empty
-            openSet   = Set.insert start Set.empty
+            openSet   = insertHeap EmpHeap start
 
 solveUtil closedSet openSet h
-    | Set.null openSet = []
-    | finalState cs    = reconstruct_path cn
-    | otherwise        = solveUtil nclosedSet nopenSet h
-    where cn           = Set.findMin openSet
-          cs           = state cn
-          smcs         = map (\(m, c) -> (makeMove cs m, Edge m c)) (successorMoves cs)
-          nclosedSet   = Set.insert cn closedSet
-          nopenSet     = updtNeig (rmFromSet openSet cn) cn h (rmInSet nclosedSet smcs)
+    | openSet == EmpHeap = []
+    | finalState cs      = reconstruct_path cn
+    | otherwise          = solveUtil nclosedSet nopenSet h
+    where cn             = node $ findMin openSet
+          cs             = state cn
+          smcs           = map (\(m, c) -> (makeMove cs m, Edge m c)) (successorMoves cs)
+          nclosedSet     = Set.insert cn closedSet
+          nopenSet       = updtNeig (deleteMinHeap openSet) cn h (rmInSet nclosedSet smcs)
 
 rmFromSet set val = Set.fromList $ List.delete val (Set.toList set)
 
@@ -248,18 +248,24 @@ updtNeig openSet cn _ [] = openSet
 updtNeig openSet cn h (smc:smcs) = updtNeig os cn h smcs
     where os = updtNeigUtil openSet cn h smc
 
-updtNeigUtil openSet cn h (s, Edge m c)
-    | (Maybe.isJust pn) = if tgs < (gScore $ Maybe.fromJust pn)
-                          then osa
-                          else openSet
-    | otherwise          = osb
-    where pn  = inSet openSet s
-          tgs = (gScore cn) + c
+updtNeigUtil openSet cn h (s, Edge m c) = insetUpdateHeap openSet cn
+    where tgs = (gScore cn) + c
           jcn = Just cn
           je  = Just $ Edge m c
           un  = Node jcn je s tgs (tgs + (h s))
-          osa = Set.insert un $ rmFromSet openSet (Maybe.fromJust pn)
-          osb = Set.insert un openSet
+
+-- updtNeigUtil openSet cn h (s, Edge m c)
+--     | (Maybe.isJust pn) = if tgs < (gScore $ Maybe.fromJust pn)
+--                           then osa
+--                           else openSet
+--     | otherwise          = osb
+--     where pn  = inSet openSet s
+--           tgs = (gScore cn) + c
+--           jcn = Just cn
+--           je  = Just $ Edge m c
+--           un  = Node jcn je s tgs (tgs + (h s))
+--           osa = Set.insert un $ rmFromSet openSet (Maybe.fromJust pn)
+--           osb = Set.insert un openSet
 
 inSet set s = List.find eqState lset
     where eqState = \n -> (state n) == s
