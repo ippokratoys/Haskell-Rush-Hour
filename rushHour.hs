@@ -1,41 +1,86 @@
+-- A* Rush Hour implementation by Thanasis Polydoros & Vasileios Sioros
+
 import qualified Data.Set   as Set
 import qualified Data.List  as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Map   as Map
 
-input ="\
+--------------------------------------------------------------------------------
+---------------------------------Examples---------------------------------------
+--------------------------------------------------------------------------------
+
+-- EASY
+input = "\
 \..abbb\n\
-\c.adee\n\
-\c==d..\n\
-\.g.dhh\n\
-\igjjjk\n\
-\illl.k\n"
+\..a.c.\n\
+\..==c.\n\
+\....d.\n\
+\....d.\n\
+\....d.\n"
 
+-- MEDIUM
+-- input ="\
+-- \..abbb\n\
+-- \c.adee\n\
+-- \c==d..\n\
+-- \.g.dhh\n\
+-- \igjjjk\n\
+-- \illl.k\n"
 
-data Point = Point { x::Int
-                    ,y::Int
-                    } deriving (Show,Eq,Ord)
+-- HARD
+-- input = "\
+-- \abccde\n\
+-- \abffde\n\
+-- \==.ghi\n\
+-- \j..ghi\n\
+-- \j..k..\n\
+-- \.llk..\n"
 
-data Car = Car { idChar :: Char
-               ,startPoint :: Point
-               ,endPoint :: Point
+printSolution s [] = putStrLn (writeState s)
+printSolution s (m:ms) = do {
+                                putStrLn (writeState s);
+                                printSolution (makeMove s m) ms
+                            }
+
+example alg prob = printSolution initState (alg initState)
+    where initState = readState prob
+
+example1 = example solve input
+example2 = example solve_astar input
+
+--------------------------------------------------------------------------------
+----------------------Rush Hour Data Structures / Methods-----------------------
+--------------------------------------------------------------------------------
+
+data Point = Point { x :: Int
+                    ,y :: Int
+                   } deriving (Show,Eq,Ord)
+
+data Car = Car { idChar     :: Char
+                ,startPoint :: Point
+                ,endPoint   :: Point
                } deriving (Show,Eq)
-
-data State = State { listOfCars :: [Car]
-                    ,lineSize:: Int
-                    ,columnSize::Int
-                    } deriving (Show,Eq)
 
 instance Ord Car where
     compare (Car '=' _ _ ) (Car idChar2 _ _) = LT
     compare (Car idChar1 _ _) (Car '=' _ _) = GT
-    compare (Car idChar1 _ _) (Car idChar2 _ _) = if (idChar1==idChar2) then EQ else (if (idChar1<idChar2) then LT else GT)
+    compare (Car idChar1 _ _) (Car idChar2 _ _) = if (idChar1 == idChar2)
+                                                  then EQ
+                                                  else (if (idChar1 < idChar2) then LT else GT)
+            
+data State = State { listOfCars :: [Car]
+                    ,lineSize   ::  Int
+                    ,columnSize ::  Int
+                   } deriving (Show,Eq)
+
+data Move = Move { getCar    :: Car
+                  ,getOffset :: Int
+                 } deriving (Show, Eq)
 
 -- gets a String and return the size of the board
 getSize :: [Char] -> (Int,Int)
 getSize s = ( 1+(length $ List.elemIndices '\n' s), if Maybe.isJust (columns) then Maybe.fromJust(columns) else (-1) )
     where columns = List.elemIndex '\n' s
-
 
 readState s = readFromStr ( State [] (fst size) (snd size) ) s (Set.empty) 0 0
     where size = getSize s
@@ -92,10 +137,8 @@ listToMap (x:xs) initVal = listToMap xs newVal
 -- return list of points that this car lives on
 pointsOfCar (Car idCa (Point x1 y1) (Point x2 y2)) = if (x1==x2) then [ (x1,yy) | yy<-[y1..y2]] else [ (xx,y1) | xx<-[x1..x2] ]
 
-data Move = Move {
-    getCar    :: Car,
-    getOffset :: Int
-} deriving (Show, Eq)
+finalState (State cars _ cols) = if horizontalPos == cols - 1 then True else False
+    where horizontalPos = y $ endPoint $ head cars
 
 makeMove (State cars rows cols) (Move car offset) = State ncars rows cols
     where point1  = startPoint car
@@ -110,13 +153,19 @@ makeMove (State cars rows cols) (Move car offset) = State ncars rows cols
           ncar    = (Car (idChar car) npoint1 npoint2)
           ncars   = List.insert ncar (List.delete car cars)
 
+-- Recursively return the legal moves of every car
+-- in the listOfCars of the given state
 successorMoves s = successorMovesUtil s (listOfCars s)
 
 successorMovesUtil _ []         = []
 successorMovesUtil s (car:cars) = (legalMoves s car) ++ successorMovesUtil s cars
 
+-- Return the legal moves of the specified car in both directions
+-- if Rotation = Vertical then (up and down)
+-- else (left and right)
 legalMoves s car = (legalMovesUtil s car 0 (\x -> x + 1)) ++ legalMovesUtil s car 0 (\x -> x - 1)
 
+-- Return the legal moves of the specified car in the given direction (next)
 legalMovesUtil s car offset next
     | legalState (makeMove s nmove) = [(nmove, cost)] ++ legalMovesUtil s car noffset next
     | otherwise                     = []
@@ -124,55 +173,60 @@ legalMovesUtil s car offset next
           nmove   = Move car noffset
           cost    = 1
 
+-- Check if any car is out of bounds or if any two cars intersect
 legalState (State cars rows cols) = if flag1 || flag2 then False else True
     where flag1 = any (True==) (map (outOfBounds rows cols) cars)
           pairs = combos Set.empty [(car1, car2) | car1<-cars, car2<-(List.delete car1 cars)]
           flag2 = any (True==) (map (\(car1, car2)-> carIntersect car1 car2) pairs)
 
+-- Discard any reversed tuples in order to save time as
+-- car1 'intersects' car2 is the same as car2 'intersects' car1
 combos _ [] = []
 combos set ((car1, car2):ccs) = if Set.member (car2, car1) set
                                 then combos set ccs
                                 else (car1, car2):combos (Set.insert (car1, car2) set) ccs
 
+-- Check given the size of the map if the car is out of bounds
 outOfBounds rows cols (Car _ (Point x1 y1) (Point x2 y2))
     | x1 < 0 || y1 < 0 || x2 >= rows || y2 >= cols = True
     | otherwise                                    = False
 
+-- Check if the two specified cars intersect in any way
 carIntersect car1 car2
     | null (List.intersect points1 points2) = False
     | otherwise                             = True
     where points1 = pointsOfCar car1
           points2 = pointsOfCar car2
 
-finalState (State cars _ cols) = if horizontalPos == cols - 1 then True else False
-    where horizontalPos = y $ endPoint $ head cars
+--------------------------------------------------------------------------------
+------------------------Solve Data Structures / Methods-------------------------
+--------------------------------------------------------------------------------
 
-data Edge = Edge {
-    move :: Move,
-    cost :: Int
-} deriving (Show, Eq)
+data Edge = Edge { move :: Move
+                  ,cost :: Int
+                 } deriving (Show, Eq)
 
-data Node = Node {
-    ancestor :: Maybe Node,
-    edge     :: Maybe Edge,
-    state    :: State,
-    gScore   :: Int,
-    fScore   :: Int
-} deriving (Show, Eq)
+data Node = Node { ancestor :: Maybe Node
+                  ,edge     :: Maybe Edge
+                  ,state    :: State
+                  ,gScore   :: Int
+                  ,fScore   :: Int
+                 } deriving (Show, Eq)
 
 instance Ord Node where
-    compare na nb = if (fScore na) < (fScore nb)
-                    then LT
-                    else GT
+    compare na nb = if (fScore na) < (fScore nb) then LT else GT
 
-solve initState     = solveUtil closedSet openSet h
-    where h         = \x -> 0
-          start     = Node Nothing Nothing initState 0 (h initState)
-          closedSet = Set.empty
-          openSet   = Set.insert start Set.empty
+solve initState       = solveBy initState (\n -> 0)
 
--- Need to take care of rmInSet, rmFromSet & inSet probably
--- i.e. Replace them with new Heap Funcionality
+solve_astar initState = solveBy initState heuristic
+
+-- Using the A* search algorithm solve the problem
+-- specified by 'initState' using the heuristic function 'h'
+solveBy initState h   = solveUtil closedSet openSet h
+    where   start     = Node Nothing Nothing initState 0 (h initState)
+            closedSet = Set.empty
+            openSet   = Set.insert start Set.empty
+
 solveUtil closedSet openSet h
     | Set.null openSet = []
     | finalState cs    = reconstruct_path cn
@@ -216,23 +270,77 @@ reconstruct_path (Node a e s g f) = (reconstruct_path ja) ++ [move je]
     where ja = Maybe.fromJust a
           je = Maybe.fromJust e
 
--- DEBUGGING
--- printSolution s [] = putStrLn (writeState s)
--- printSolution s (m:ms) = do {
---                                 putStrLn (writeState s);
---                                 printSolution (makeMove s m) ms
---                             }
+--------------------------------------------------------------------------------
+------------------------------Heuristic Function--------------------------------
+--------------------------------------------------------------------------------
 
--- main :: IO()
--- main = printSolution state (solve state)
---     where state = readState "...a\n==.a\n....\n....\n"
+heuristic s = (heuristicUtil s pntsRight)+(if ((length pntsRight)/=0) then 1 else 0)
+    where
+        goalStart   = startPoint $head $listOfCars s
+        goalEnd     = endPoint $head $listOfCars s
+        numLines    = lineSize s
+        numCols     = columnSize s
+        pntsOfGoal  = pointsOfCar $head $listOfCars s
+        rightMost   = last pntsOfGoal
+        pntsRight   = [ (i,j) | i<-[fst rightMost], j<-[((snd rightMost)+1)..(numCols-1) ] ]
 
------------------------- pairing heap code -------------------------------------
+heuristicUtil s [] = 0
+heuristicUtil s (pnt:pnts)
+    | Maybe.isJust carThere = max (1 + extraCost) (heuristicUtil s pnts)
+    | otherwise = 0 + (heuristicUtil s pnts)
+    where
+        carThere  = findCar (fst pnt) (snd pnt) (listOfCars s)
+        dataCar   = Maybe.fromJust carThere
+        extraCost = canMove [] (Just dataCar) s
 
-data HeapElem = EmpHeapElem | HeapElem{curState::Node} deriving (Show,Ord,Eq)
+canMove _     Nothing    _ = 0
+canMove seen (Just aCar) s
+    | elem aCar seen = 0
+    | isVertical     =
+        if ((inBounds verticalBefore s && Maybe.isNothing carUp) || (inBounds verticalAfter s && Maybe.isNothing carDown))
+        then 0
+        else 1 + (min (canMove newSeen ( carUp) s) (canMove newSeen ( carDown) s))
+    | otherwise      =
+        if ((inBounds horizontalBefore s && Maybe.isNothing carLeft ) || ( inBounds horizontalAfter s && Maybe.isNothing carRight))
+        then 0
+        else 1 + (min (canMove newSeen ( carLeft) s) (canMove newSeen ( carRight) s))
+    where
+        isVertical         = (y $startPoint aCar) == (y $endPoint aCar)
+        verticalBefore     = ((x $startPoint aCar)-1,y $startPoint aCar)
+        verticalAfter      = (1+(x $endPoint aCar),y $endPoint aCar)
+        horizontalBefore   = (x $startPoint aCar, (y $startPoint aCar)-1)
+        horizontalAfter    = (x $endPoint aCar, 1+(y $endPoint aCar))
+        carUp              = tryFindCar (fst verticalBefore) (snd verticalBefore) s
+        carDown            = tryFindCar (fst verticalAfter) (snd verticalAfter) s
+        carLeft            = tryFindCar (fst horizontalBefore) (snd horizontalBefore) s
+        carRight           = tryFindCar (fst horizontalAfter) (snd horizontalAfter) s
+        newSeen            = (aCar:seen)
 
-data PairingHeap = EmpHeap | PairingHeap { headOfHeap :: HeapElem
-                                        ,subheaps:: [PairingHeap] } deriving (Show,Eq)
+tryFindCar i j s = if ( i < (lineSize s)) && (j < (columnSize s)) then findCar i j (listOfCars s) else Nothing
+
+findCar i j ([]) = Nothing
+findCar i j (fCar:tCars)
+    |elem (i,j) (pointsOfCar fCar)  = Just fCar
+    |otherwise                        = findCar i j (tCars)
+
+isFree pnt s
+    | outOfBounds (lineSize s) (columnSize s) fakeCar = False
+    | Maybe.isJust carThere = False
+    | otherwise = True
+    where
+        fakeCar  = Car '=' (Point (fst pnt) (snd pnt)) (Point (fst pnt) (snd pnt))
+        carThere = findCar (fst pnt) (snd pnt) (listOfCars s)
+
+inBounds (i,j) s = if ( i < (lineSize s)) && (j < (columnSize s)) then True else False
+
+--------------------------------------------------------------------------------          
+----------------------------Pairing Heap Code--------------------------------------
+--------------------------------------------------------------------------------
+
+data HeapElem = EmpHeapElem | HeapElem{node :: Node} deriving (Show,Ord,Eq)
+
+data PairingHeap = EmpHeap | PairingHeap { headOfHeap ::  HeapElem
+                                          ,subheaps   :: [PairingHeap] } deriving (Show,Eq)
 
 -- instance Ord HeapElem where
 --     compare (HeapElem cost1 _) (HeapElem cost2 _) = compare cost1 cost2
@@ -273,7 +381,7 @@ deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
 
 insetUpdateHeap EmpHeap _ = EmpHeap
 insetUpdateHeap (PairingHeap EmpHeapElem subStates) delState = (PairingHeap EmpHeapElem subStates)
-insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (curState headState) delState && isBetterNode delState (curState headState))
+insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (node headState) delState && isBetterNode delState (node headState))
     then (insertHeap (deleteMinHeap (PairingHeap headState subStates)) (HeapElem delState))
     else (if isDone
         then theUpdList
@@ -285,7 +393,7 @@ insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (cur
         theInsList  = insertHeap (PairingHeap headState subStates) (HeapElem delState)
 
 updateElemHeap delState [] = (False,[])
-updateElemHeap delState (st:sts) = if (isSameNode delState $curState $headOfHeap st) && (isBetterNode delState $curState $headOfHeap st)
+updateElemHeap delState (st:sts) = if (isSameNode delState $node $headOfHeap st) && (isBetterNode delState $node $headOfHeap st)
     then (updatedRes)
     else ((fst res),(st:(snd res)))
     where
@@ -295,66 +403,4 @@ updateElemHeap delState (st:sts) = if (isSameNode delState $curState $headOfHeap
 -- deleteElemHeap initHeap delState =
 
 isSameNode s1 s2 = (state s1) == (state s2)
-isBetterNode s1 s2 = fScore s1 > fScore s2
---------------------------------------------------------------------------------
----------------------------- heuristic -----------------------------------------
-tryFindCar i j s = if ( i < (lineSize s)) && (j < (columnSize s)) then findCar i j (listOfCars s) else Nothing
-findCar i j ([]) = Nothing
-findCar i j (fCar:tCars)
-    |elem (i,j) (pointsOfCar fCar)  = Just fCar
-    |otherwise                        = findCar i j (tCars)
-
-heuristic s = (heuristicUtil s pntsRight)+(if ((length pntsRight)/=0) then 1 else 0)
-    where
-        goalStart   = startPoint $head $listOfCars s
-        goalEnd     = endPoint $head $listOfCars s
-        numLines    = lineSize s
-        numCols     = columnSize s
-        pntsOfGoal  = pointsOfCar $head $listOfCars s
-        rightMost   = last pntsOfGoal
-        pntsRight   = [ (i,j) | i<-[fst rightMost], j<-[((snd rightMost)+1)..(numCols-1) ] ]
-
-heuristicUtil s [] = 0
-heuristicUtil s (pnt:pnts)
-    | Maybe.isJust carThere = max (1 + extraCost) (heuristicUtil s pnts)
-    | otherwise = 0 + (heuristicUtil s pnts)
-    where
-        carThere  = findCar (fst pnt) (snd pnt) (listOfCars s)
-        dataCar   = Maybe.fromJust carThere
-        extraCost = canMove [] (Just dataCar) s
-
-canMove _ (Nothing) s = 0
-
-canMove seen (Just aCar) s
-    | elem aCar seen = 0
-    | isVertical    =
-        if ((inBounds verticalBefore s && Maybe.isNothing carUp) || (inBounds verticalAfter s && Maybe.isNothing carDown)) then
-            0
-         else
-             1+(min (canMove newSeen ( carUp) s) (canMove newSeen ( carDown) s))
-    | otherwise     =
-        if ((inBounds horizontalBefore s && Maybe.isNothing carLeft ) || ( inBounds horizontalAfter s && Maybe.isNothing carRight)) then
-            0
-        else
-            1+(min (canMove newSeen ( carLeft) s) (canMove newSeen ( carRight) s))
-    where
-        isVertical         = (y $startPoint aCar) == (y $endPoint aCar)
-        verticalBefore     = ((x $startPoint aCar)-1,y $startPoint aCar)
-        verticalAfter      = (1+(x $endPoint aCar),y $endPoint aCar)
-        horizontalBefore   = (x $startPoint aCar, (y $startPoint aCar)-1)
-        horizontalAfter    = (x $endPoint aCar, 1+(y $endPoint aCar))
-        carUp              = tryFindCar (fst verticalBefore) (snd verticalBefore) s
-        carDown            = tryFindCar (fst verticalAfter) (snd verticalAfter) s
-        carLeft            = tryFindCar (fst horizontalBefore) (snd horizontalBefore) s
-        carRight           = tryFindCar (fst horizontalAfter) (snd horizontalAfter) s
-        newSeen            = (aCar:seen)
-
-isFree pnt s
-    | outOfBounds (lineSize s) (columnSize s) fakeCar = False
-    | Maybe.isJust carThere = False
-    | otherwise = True
-    where
-        fakeCar  = Car '=' (Point (fst pnt) (snd pnt)) (Point (fst pnt) (snd pnt))
-        carThere = findCar (fst pnt) (snd pnt) (listOfCars s)
-
-inBounds (i,j) s = if ( i < (lineSize s)) && (j < (columnSize s)) then True else False
+isBetterNode s1 s2 = fScore s1 < fScore s2
