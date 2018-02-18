@@ -1,4 +1,5 @@
--- A* Rush Hour implementation by Thanasis Polydoros & Vasileios Sioros
+-- A* Rush Hour implementation by
+-- Thanasis Polydoros(1400164) & Vasileios Sioros(1500144)
 
 import qualified Data.Set   as Set
 import qualified Data.List  as List
@@ -10,22 +11,22 @@ import qualified Data.Map   as Map
 --------------------------------------------------------------------------------
 
 -- EASY
--- input = "\
--- \..abbb\n\
--- \..a.c.\n\
--- \..==c.\n\
--- \....d.\n\
--- \....d.\n\
--- \....d.\n"
+input = "\
+\..abbb\n\
+\..a.c.\n\
+\..==c.\n\
+\....d.\n\
+\....d.\n\
+\....d.\n"
 
 -- MEDIUM
-input = "\
-\abccde\n\
-\abffde\n\
-\==.ghi\n\
-\j..ghi\n\
-\j..k..\n\
-\.llk..\n"
+-- input = "\
+-- \abccde\n\
+-- \abffde\n\
+-- \==.ghi\n\
+-- \j..ghi\n\
+-- \j..k..\n\
+-- \.llk..\n"
 
 -- HARD
 -- input = "\
@@ -374,13 +375,11 @@ mergeHeaps (heap1:heap2:heaps) = mergeHeap heap12 (mergeHeaps heaps)
     where
         heap12 = mergeHeap heap1 heap2
 
--- updateHeap theHeap newElem =
 
 deleteMinHeap EmpHeap = EmpHeap
 deleteMinHeap heap1 = mergeHeaps (subheaps heap1)
 
 insetUpdateHeap EmpHeap _ = EmpHeap
-insetUpdateHeap (PairingHeap EmpHeapElem subStates) delState = (PairingHeap EmpHeapElem subStates)
 insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (node headState) delState && isBetterNode delState (node headState))
     then (insertHeap (deleteMinHeap (PairingHeap headState subStates)) (HeapElem delState))
     else (if isDone
@@ -395,12 +394,13 @@ insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (nod
 updateElemHeap delState [] = (False,[])
 updateElemHeap delState (st:sts) = if (isSameNode delState $node $headOfHeap st)
     then (ifBetter)
-    else ((fst res),(st:(snd res)))
+    else if ((fst resSub)==True) then (True,(snd resSub)++sts) else ((fst resTail),([st]++(snd resTail)))
     where
         newState = deleteMinHeap st
         updatedRes = if (newState)==EmpHeap then (True,sts) else (True,newState:sts)
         ifBetter = if (isBetterNode delState $node $headOfHeap st) then updatedRes else (True,st:sts)
-        res = updateElemHeap delState sts
+        resTail = updateElemHeap delState sts
+        resSub = updateElemHeap delState (subheaps st)
 -- deleteElemHeap initHeap delState =
 
 isSameNode s1 s2 = (state s1) == (state s2)
