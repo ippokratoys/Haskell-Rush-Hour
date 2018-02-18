@@ -67,7 +67,7 @@ instance Ord Car where
     compare (Car idChar1 _ _) (Car idChar2 _ _) = if (idChar1 == idChar2)
                                                   then EQ
                                                   else (if (idChar1 < idChar2) then LT else GT)
-            
+
 data State = State { listOfCars :: [Car]
                     ,lineSize   ::  Int
                     ,columnSize ::  Int
@@ -333,7 +333,7 @@ isFree pnt s
 
 inBounds (i,j) s = if ( i < (lineSize s)) && (j < (columnSize s)) then True else False
 
---------------------------------------------------------------------------------          
+--------------------------------------------------------------------------------
 ----------------------------Pairing Heap Code--------------------------------------
 --------------------------------------------------------------------------------
 
@@ -387,18 +387,19 @@ insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (nod
         then theUpdList
         else theInsList)
     where
-        isDone      = fst resOfDel
         resOfDel    = updateElemHeap delState subStates
+        isDone      = fst resOfDel
         theUpdList  = PairingHeap headState (snd resOfDel)
         theInsList  = insertHeap (PairingHeap headState subStates) (HeapElem delState)
 
 updateElemHeap delState [] = (False,[])
-updateElemHeap delState (st:sts) = if (isSameNode delState $node $headOfHeap st) && (isBetterNode delState $node $headOfHeap st)
-    then (updatedRes)
+updateElemHeap delState (st:sts) = if (isSameNode delState $node $headOfHeap st)
+    then (ifBetter)
     else ((fst res),(st:(snd res)))
     where
         newState = deleteMinHeap st
         updatedRes = if (newState)==EmpHeap then (True,sts) else (True,newState:sts)
+        ifBetter = if (isBetterNode delState $node $headOfHeap st) then updatedRes else (True,st:sts)
         res = updateElemHeap delState sts
 -- deleteElemHeap initHeap delState =
 
