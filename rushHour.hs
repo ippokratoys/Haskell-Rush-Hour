@@ -232,7 +232,7 @@ reconstruct_path (Node a e s g f) = (reconstruct_path ja) ++ [move je]
 data HeapElem = EmpHeapElem | HeapElem{curState::Node} deriving (Show,Ord,Eq)
 
 data PairingHeap = EmpHeap | PairingHeap { headOfHeap :: HeapElem
-                                        ,subheaps:: [PairingHeap] } deriving (Show)
+                                        ,subheaps:: [PairingHeap] } deriving (Show,Eq)
 
 -- instance Ord HeapElem where
 --     compare (HeapElem cost1 _) (HeapElem cost2 _) = compare cost1 cost2
@@ -279,17 +279,18 @@ insetUpdateHeap (PairingHeap headState subStates) delState = if (isSameNode (cur
         then theUpdList
         else theInsList)
     where
-        resOfDel    = updateElemHeap delState subStates
         isDone      = fst resOfDel
+        resOfDel    = updateElemHeap delState subStates
         theUpdList  = PairingHeap headState (snd resOfDel)
         theInsList  = insertHeap (PairingHeap headState subStates) (HeapElem delState)
 
 updateElemHeap delState [] = (False,[])
 updateElemHeap delState (st:sts) = if (isSameNode delState $curState $headOfHeap st) && (isBetterNode delState $curState $headOfHeap st)
-    then (True,(newState:sts))
+    then (updatedRes)
     else ((fst res),(st:(snd res)))
     where
-        newState = insertHeap (deleteMinHeap st) (HeapElem delState)
+        newState = deleteMinHeap st
+        updatedRes = if (newState)==EmpHeap then (True,sts) else (True,newState:sts)
         res = updateElemHeap delState sts
 -- deleteElemHeap initHeap delState =
 
